@@ -2,8 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
-import bcrypt from "bcrypt";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs"; // bcryptjs e compatibil cu esbuild
 import jwt from "jsonwebtoken";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -37,7 +36,7 @@ const authenticateToken = async (req: any, res: any, next: any) => {
   const token = auth.split(" ")[1];
   try {
     const payload: any = jwt.verify(token, JWT_SECRET);
-    const user = await db.select().from(users).where(users.id.eq(payload.id));
+    const user = await db.select().from(users).where("id", "=", payload.id);
     if (!user.length) return res.status(401).json({ error: "Invalid token" });
     req.user = user[0];
     next();
@@ -55,27 +54,17 @@ app.get("/health", (_, res) => {
   res.json({ status: "ok" });
 });
 
-// Get all users (optional)
-app.get("/users", async (_, res) => {
-  try {
-    const allUsers = await db.select().from(users);
-    res.json(allUsers);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
-  }
+// Get current logged-in user
+app.get("/api/auth/user", authenticateToken, (req, res) => {
+  res.json(req.user);
 });
-
-// ----------------------
-// Auth routes
-// ----------------------
 
 // Login
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Email and password required" });
 
-  const user = await db.select().from(users).where(users.email.eq(email));
+  const user = await db.select().from(users).where("email", "=", email);
   if (!user.length) return res.status(401).json({ error: "Invalid email or password" });
 
   const match = await bcrypt.compare(password, user[0].password);
@@ -85,12 +74,12 @@ app.post("/api/auth/login", async (req, res) => {
   res.json({ token });
 });
 
-// Create new account
+// Register
 app.post("/api/auth/register", async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) return res.status(400).json({ error: "All fields required" });
 
-  const existing = await db.select().from(users).where(users.email.eq(email));
+  const existing = await db.select().from(users).where("email", "=", email);
   if (existing.length) return res.status(409).json({ error: "Email already exists" });
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -103,11 +92,6 @@ app.post("/api/auth/register", async (req, res) => {
 
   const token = generateToken(newUser.id);
   res.json({ token });
-});
-
-// Get current logged-in user
-app.get("/api/auth/user", authenticateToken, (req, res) => {
-  res.json(req.user);
 });
 
 // ----------------------
@@ -131,20 +115,19 @@ const ADMIN_NAME = process.env.ADMIN_NAME || "Admin";
 
 async function seedAdmin() {
   try {
-    const existing = await db.select().from(users).where(users.email.eq(ADMIN_EMAIL));
+    const existing = await db.select().from(users).where("email", "=", ADMIN_EMAIL);
     if (existing.length) {
       console.log(`✅ Admin user already exists: ${ADMIN_EMAIL}`);
       return;
     }
 
     const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
-    const [newUser] = await db.insert(users).values({
+    await db.insert(users).values({
       email: ADMIN_EMAIL,
       password: hashedPassword,
       name: ADMIN_NAME,
       created_at: new Date(),
-    }).returning();
-
+    });
     console.log(`🚀 Admin user created successfully!`);
     console.log(`Email: ${ADMIN_EMAIL}`);
     console.log(`Password: ${ADMIN_PASSWORD}`);
