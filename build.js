@@ -23,9 +23,6 @@ async function buildServer() {
         'react-dom',
         'vite'
       ],
-      define: {
-        '__dirname': `(await import('url')).fileURLToPath(new URL('.', import.meta.url))`,
-      },
       banner: {
         js: `
 import { createRequire } from 'module';
