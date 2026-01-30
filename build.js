@@ -1,8 +1,16 @@
 import esbuild from 'esbuild';
+import { readFileSync } from 'fs';
 
 async function buildServer() {
   try {
     console.log('🔨 Building server...');
+    
+    // Read package.json to get all dependencies
+    const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
+    const allDependencies = [
+      ...Object.keys(pkg.dependencies || {}),
+      ...Object.keys(pkg.devDependencies || {})
+    ];
     
     await esbuild.build({
       entryPoints: ['server/index.ts'],
@@ -11,18 +19,8 @@ async function buildServer() {
       target: 'node18',
       format: 'esm',
       outfile: 'dist/server.js',
-      external: [
-        'express',
-        'pg',
-        'bcryptjs',
-        'jsonwebtoken',
-        'drizzle-orm',
-        '@tanstack/*',
-        '@radix-ui/*',
-        'react',
-        'react-dom',
-        'vite'
-      ],
+      // External: ALL dependencies to avoid bundling issues
+      external: allDependencies,
       banner: {
         js: `
 import { createRequire } from 'module';
@@ -35,7 +33,7 @@ const __dirname = dirname(__filename);
 `
       },
       logLevel: 'info',
-      minify: true,
+      minify: false, // Don't minify to make debugging easier
     });
     
     console.log('✅ Server build complete!');

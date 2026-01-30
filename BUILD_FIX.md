@@ -1,34 +1,65 @@
-# 🔧 FIX: esbuild Define Error
+# 🔧 FIX: esbuild Bundling Errors
 
-## ❌ Eroarea
+## ❌ Erorile
 
 ```
-[ERROR] Invalid define value (must be an entity name or JS literal): 
-(await import('url')).fileURLToPath(new URL('.', import.meta.url))
+[ERROR] Could not resolve "@babel/preset-typescript/package.json"
+[ERROR] Could not resolve "../pkg"
+[ERROR] No loader is configured for ".node" files
 ```
 
 ## 🔍 Cauza
 
-În `build.js`, linia 26-28 avea:
-```javascript
-define: {
-  '__dirname': `(await import('url')).fileURLToPath(new URL('.', import.meta.url))`,
-},
-```
+esbuild încerca să **bundle** toate dependencies-urile, inclusiv:
+- Babel (nu trebuie bundled)
+- Tailwind CSS native binaries (.node files)
+- lightningcss native binaries
+- Toate celelalte node_modules
 
-**Problema**: `esbuild.define` acceptă DOAR:
-- Simple string literals: `"production"`
-- Boolean literals: `true` / `false`
-- Number literals: `123`
-- Simple identifiers: `process.env.NODE_ENV`
-
-**NU** acceptă expresii complexe sau async imports!
+**Problema**: Aceste pachete au:
+- Native binaries (.node files)
+- Complex resolution paths
+- Dynamic requires
+- Nu pot/nu trebuie să fie bundle-ate
 
 ## ✅ Soluția
 
-Am **ELIMINAT** complet secțiunea `define` din `build.js`.
+Am modificat `build.js` să **excludă TOATE** dependencies din bundle:
 
-Nu e nevoie de `define` pentru că deja avem `banner` care definește `__dirname`:
+```javascript
+import esbuild from 'esbuild';
+import { readFileSync } from 'fs';
+
+async function buildServer() {
+  // Citim package.json
+  const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
+  const allDependencies = [
+    ...Object.keys(pkg.dependencies || {}),
+    ...Object.keys(pkg.devDependencies || {})
+  ];
+  
+  await esbuild.build({
+    // ...
+    external: allDependencies, // ✅ Exclude TOATE dependencies
+    minify: false, // ✅ Nu minify pentru debugging mai ușor
+  });
+}
+```
+
+## 📊 Ce face acum build-ul:
+
+1. **Bundle** doar codul tău din `server/`
+2. **Exclude** toate node_modules (vor fi folosite din node_modules/ la runtime)
+3. **Nu minify** codul (debugging mai ușor, erori mai clare)
+4. **Păstrează** toate imports pentru dependencies
+
+## ✅ Avantaje
+
+- ✅ Build rapid (nu mai bundle dependencies mari)
+- ✅ Nu mai erori cu native binaries
+- ✅ Nu mai erori cu dynamic requires
+- ✅ Debugging mai ușor (cod necomprimat)
+- ✅ File mai mic (dependencies separate)
 
 ```javascript
 banner: {
