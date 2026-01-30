@@ -171,3 +171,12 @@ export type DashboardStats = {
   lowStockCount: number;
   pendingShipments: number;
 };
+
+
+export const users = pgTable('users', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  password: text('password').notNull(),
+  name: text('name').notNull(),  // ← UN SINGUR CÂMP
+  // ...
+});
