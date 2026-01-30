@@ -5,12 +5,11 @@ async function buildServer() {
   try {
     console.log('🔨 Building server...');
     
-    // Read package.json to get all dependencies
     const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
     const allDependencies = [
       ...Object.keys(pkg.dependencies || {}),
       ...Object.keys(pkg.devDependencies || {}),
-      'module', 'url', 'path'  // ✅ Adaugă astea ca external să NU bundle polyfill-urile
+      'module', 'url', 'path', 'fs', 'path'  // ✅ Externalize BUILT-IN Node modules
     ];
     
     await esbuild.build({
@@ -20,18 +19,7 @@ async function buildServer() {
       target: 'node18',
       format: 'esm',
       outfile: 'dist/server.js',
-      external: allDependencies,
-      banner: {
-        js: `
-const { createRequire } = await import('module');
-const { fileURLToPath } = await import('url');
-const { dirname } = await import('path');
-
-const require = createRequire(import.meta.url);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-`  // ✅ Dinamic imports: evită duplicate + merge pe Node 18+ [web:27][web:33]
-      },
+      external: allDependencies,  // ✅ NO banner! Esbuild NU adaugă imports duplicate
       logLevel: 'info',
       minify: false,
     });
