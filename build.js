@@ -1,13 +1,10 @@
-import { fileURLToPath } from 'url';
-import path from 'path';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import esbuild from 'esbuild';
 
 async function buildServer() {
   try {
     console.log('🔨 Building server...');
     
-    await build({
+    await esbuild.build({
       entryPoints: ['server/index.ts'],
       bundle: true,
       platform: 'node',
