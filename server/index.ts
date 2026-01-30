@@ -131,10 +131,11 @@ async function seedAdmin() {
 
     const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
     await db.insert(users).values({
-      email: ADMIN_EMAIL,
+      id: nanoid(),
+      email: adminEmail,
       password: hashedPassword,
-      name: ADMIN_NAME,
-      created_at: new Date(),
+      name: 'Admin User',       // ← UN SINGUR CÂMP
+      role: 'admin',
     });
     console.log(`🚀 Admin user created: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
   } catch (err) {
