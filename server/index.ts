@@ -31,8 +31,8 @@ app.get("/users", async (_, res) => {
   }
 });
 
-// Fallback -> frontend routing
-app.get("/*", (_, res) => {
+// SPA fallback -> IMPORTANT: must have named param for ESM + path-to-regexp
+app.get("/:catchAll(.*)", (_, res) => {
   res.sendFile(path.join(publicPath, "index.html"));
 });
 
