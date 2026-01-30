@@ -32,7 +32,7 @@ app.get("/users", async (_, res) => {
 });
 
 // Fallback -> frontend routing
-app.get("*", (_, res) => {
+app.get("/*", (_, res) => {
   res.sendFile(path.join(publicPath, "index.html"));
 });
 
