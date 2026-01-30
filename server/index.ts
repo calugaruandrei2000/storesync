@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db } from "./db";
 import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,7 +23,8 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 // ----------------------
 // Helper functions
 // ----------------------
-const generateToken = (userId: number) => jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: "1h" });
+const generateToken = (userId: number) =>
+  jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: "1h" });
 
 const authenticateToken = async (req: any, res: any, next: any) => {
   const auth = req.headers.authorization;
@@ -31,9 +33,9 @@ const authenticateToken = async (req: any, res: any, next: any) => {
   const token = auth.split(" ")[1];
   try {
     const payload: any = jwt.verify(token, JWT_SECRET);
-    const user = await db.select().from(users).where("id", "=", payload.id);
-    if (!user.length) return res.status(401).json({ error: "Invalid token" });
-    req.user = user[0];
+    const [user] = await db.select().from(users).where(eq(users.id, payload.id));
+    if (!user) return res.status(401).json({ error: "Invalid token" });
+    req.user = user;
     next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });
@@ -51,13 +53,13 @@ app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Email and password required" });
 
-  const user = await db.select().from(users).where("email", "=", email);
-  if (!user.length) return res.status(401).json({ error: "Invalid email or password" });
+  const [user] = await db.select().from(users).where(eq(users.email, email));
+  if (!user) return res.status(401).json({ error: "Invalid email or password" });
 
-  const match = await bcrypt.compare(password, user[0].password);
+  const match = await bcrypt.compare(password, user.password);
   if (!match) return res.status(401).json({ error: "Invalid email or password" });
 
-  const token = generateToken(user[0].id);
+  const token = generateToken(user.id);
   res.json({ token });
 });
 
@@ -65,8 +67,8 @@ app.post("/api/auth/register", async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) return res.status(400).json({ error: "All fields required" });
 
-  const existing = await db.select().from(users).where("email", "=", email);
-  if (existing.length) return res.status(409).json({ error: "Email already exists" });
+  const [existing] = await db.select().from(users).where(eq(users.email, email));
+  if (existing) return res.status(409).json({ error: "Email already exists" });
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const [newUser] = await db.insert(users).values({
@@ -121,8 +123,8 @@ const ADMIN_NAME = process.env.ADMIN_NAME || "Admin";
 
 async function seedAdmin() {
   try {
-    const existing = await db.select().from(users).where("email", "=", ADMIN_EMAIL);
-    if (existing.length) {
+    const [existing] = await db.select().from(users).where(eq(users.email, ADMIN_EMAIL));
+    if (existing) {
       console.log(`✅ Admin already exists: ${ADMIN_EMAIL}`);
       return;
     }
@@ -152,3 +154,4 @@ async function startServer() {
 }
 
 startServer();
+
