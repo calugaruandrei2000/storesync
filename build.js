@@ -9,7 +9,8 @@ async function buildServer() {
     const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
     const allDependencies = [
       ...Object.keys(pkg.dependencies || {}),
-      ...Object.keys(pkg.devDependencies || {})
+      ...Object.keys(pkg.devDependencies || {}),
+      'module', 'url', 'path'  // ✅ Adaugă astea ca external să NU bundle polyfill-urile
     ];
     
     await esbuild.build({
@@ -19,21 +20,20 @@ async function buildServer() {
       target: 'node18',
       format: 'esm',
       outfile: 'dist/server.js',
-      // External: ALL dependencies to avoid bundling issues
       external: allDependencies,
       banner: {
         js: `
-import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+const { createRequire } = await import('module');
+const { fileURLToPath } = await import('url');
+const { dirname } = await import('path');
 
 const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-`
+`  // ✅ Dinamic imports: evită duplicate + merge pe Node 18+ [web:27][web:33]
       },
       logLevel: 'info',
-      minify: false, // Don't minify to make debugging easier
+      minify: false,
     });
     
     console.log('✅ Server build complete!');
