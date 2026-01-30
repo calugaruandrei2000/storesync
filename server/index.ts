@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
-import bcrypt from "bcryptjs"; // bcryptjs e compatibil cu esbuild
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -11,23 +11,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
-// Serve static frontend (Vite build)
 const publicPath = path.join(__dirname, "../dist/public");
 app.use(express.static(publicPath));
 
-// JWT secret
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
 // ----------------------
 // Helper functions
 // ----------------------
-const generateToken = (userId: number) => {
-  return jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: "1h" });
-};
+const generateToken = (userId: number) => jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: "1h" });
 
 const authenticateToken = async (req: any, res: any, next: any) => {
   const auth = req.headers.authorization;
@@ -48,18 +43,10 @@ const authenticateToken = async (req: any, res: any, next: any) => {
 // ----------------------
 // API Routes
 // ----------------------
+app.get("/health", (_, res) => res.json({ status: "ok" }));
 
-// Health check
-app.get("/health", (_, res) => {
-  res.json({ status: "ok" });
-});
+app.get("/api/auth/user", authenticateToken, (req, res) => res.json(req.user));
 
-// Get current logged-in user
-app.get("/api/auth/user", authenticateToken, (req, res) => {
-  res.json(req.user);
-});
-
-// Login
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Email and password required" });
@@ -74,7 +61,6 @@ app.post("/api/auth/login", async (req, res) => {
   res.json({ token });
 });
 
-// Register
 app.post("/api/auth/register", async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) return res.status(400).json({ error: "All fields required" });
@@ -107,7 +93,27 @@ app.use((req, res, next) => {
 });
 
 // ----------------------
-// Automatic admin seed
+// Create table users if not exists
+// ----------------------
+async function createUsersTable() {
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        name TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log("✅ Table 'users' ensured.");
+  } catch (err) {
+    console.error("❌ Error creating users table:", err);
+  }
+}
+
+// ----------------------
+// Seed admin user
 // ----------------------
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@example.com";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin123!";
@@ -117,7 +123,7 @@ async function seedAdmin() {
   try {
     const existing = await db.select().from(users).where("email", "=", ADMIN_EMAIL);
     if (existing.length) {
-      console.log(`✅ Admin user already exists: ${ADMIN_EMAIL}`);
+      console.log(`✅ Admin already exists: ${ADMIN_EMAIL}`);
       return;
     }
 
@@ -128,11 +134,9 @@ async function seedAdmin() {
       name: ADMIN_NAME,
       created_at: new Date(),
     });
-    console.log(`🚀 Admin user created successfully!`);
-    console.log(`Email: ${ADMIN_EMAIL}`);
-    console.log(`Password: ${ADMIN_PASSWORD}`);
+    console.log(`🚀 Admin user created: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
   } catch (err) {
-    console.error("❌ Error seeding admin user:", err);
+    console.error("❌ Error seeding admin:", err);
   }
 }
 
@@ -140,11 +144,11 @@ async function seedAdmin() {
 // Start server
 // ----------------------
 async function startServer() {
-  await seedAdmin(); // seed admin before listening
+  await createUsersTable();
+  await seedAdmin();
+
   const PORT = process.env.PORT || 3001;
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-  });
+  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 }
 
 startServer();
