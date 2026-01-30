@@ -177,6 +177,8 @@ export const users = pgTable('users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
   password: text('password').notNull(),
-  name: text('name').notNull(),  // ← UN SINGUR CÂMP
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  company: text('company'),
   // ...
 });
